@@ -1,0 +1,5 @@
+dist/
+test-output/
+*.user
+*.tmp
+host-update/SubtitleEdit.exe

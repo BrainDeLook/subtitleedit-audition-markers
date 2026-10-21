@@ -1,0 +1,8 @@
+{
+  "sourceVersion": "4.0.28.4",
+  "targetVersion": "4.0.28.5",
+  "sourceSha256": "DBB35E3A7FD18E397C5CDA8AF3F973755F002458096E5210A6C211DCB982DFDB",
+  "targetSha256": "738D2F1C011EACFF9634AB1EC0294027CAB9330963FDBA2E212F32CF1BC8513F",
+  "sourceRepository": "https://github.com/BrainDeLook/subtitleedit-classic",
+  "sourceCommit": "48bcc5e"
+}

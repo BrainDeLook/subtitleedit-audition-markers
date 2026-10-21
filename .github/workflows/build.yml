@@ -1,0 +1,34 @@
+name: Build and test plugin
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install reference Classic in an isolated directory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path $env:RUNNER_TEMP 'ClassicSetup.exe'
+          Invoke-WebRequest 'https://github.com/BrainDeLook/subtitleedit-classic/releases/download/4.0.28/SubtitleEdit-Classic-4.0.28-Setup.exe' -OutFile $setup
+          if ((Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash -ne 'B714DA1434CE2EFC89E92E4E4E38AEC95829F7B5F629F17F4C9C7225CE0D4456') { throw 'Reference installer checksum mismatch' }
+          $classic = Join-Path $env:RUNNER_TEMP 'Classic'
+          $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/NOICONS','/TASKS=',('/DIR="'+$classic+'"')) -WindowStyle Hidden -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw 'Reference installation failed' }
+          "CLASSIC_DIRECTORY=$classic" | Add-Content $env:GITHUB_ENV
+      - name: Build and test
+        shell: pwsh
+        run: ./build.ps1 -ClassicDirectory $env:CLASSIC_DIRECTORY -Test
+      - name: Package
+        shell: pwsh
+        run: ./package.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AuditionMarkers
+          path: dist/AuditionMarkers-1.0.0.zip
+          if-no-files-found: error
