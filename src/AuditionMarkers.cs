@@ -32,6 +32,7 @@ namespace Nikse.SubtitleEdit.PluginLogic
         public bool TextAsName { get; set; }
         public bool IncludeDescription { get; set; }
         public bool SelectedOnly { get; set; }
+        public bool RenumberSelected { get; set; }
         public string OutputFolder { get; set; }
         public ExportOptions() { IncludeDescription = true; OutputFolder = ""; }
     }
@@ -91,7 +92,11 @@ namespace Nikse.SubtitleEdit.PluginLogic
                 string start = Time(cue.StartTime.TotalMilliseconds);
                 string duration = options.RangeMarkers ? Time(cue.EndTime.TotalMilliseconds - cue.StartTime.TotalMilliseconds) : "0:00.000";
                 string text = PlainText(cue.Text);
-                string name = options.TextAsName && text.Length > 0 ? text : "Маркер " + (i + 1);
+                string number = (i + 1).ToString(CultureInfo.InvariantCulture);
+                string markerName = options.SelectedOnly && options.RenumberSelected
+                    ? "Маркер " + (count + 1).ToString(CultureInfo.InvariantCulture) + " (" + number + ")"
+                    : "Маркер " + number;
+                string name = options.TextAsName && text.Length > 0 ? text : markerName;
                 output.Append(Field(name)).Append('\t').Append(start).Append('\t').Append(duration)
                     .Append("\tdecimal\tCue\t").Append(Field(options.IncludeDescription ? text : "")).Append("\r\n");
                 count++;
@@ -126,7 +131,7 @@ namespace Nikse.SubtitleEdit.PluginLogic
     {
         public string Name { get { return "AuditionMarkers"; } }
         public string Text { get { return Ru ? "Маркеры Audition" : "Audition markers"; } }
-        public decimal Version { get { return 1.0m; } }
+        public decimal Version { get { return 1.1m; } }
         public string Description { get { return "One-click Adobe Audition CSV marker export (DeCoCo)."; } }
         public string ActionType { get { return "Tool"; } }
         public string Shortcut { get { return ""; } }
@@ -179,7 +184,7 @@ namespace Nikse.SubtitleEdit.PluginLogic
 
         private bool EditOptions(Form parent, ExportOptions options)
         {
-            using (var dialog = new Form { Text = Text + " — " + Tr("Settings", "Настройки"), Width = 580, Height = 340,
+            using (var dialog = new Form { Text = Text + " — " + Tr("Settings", "Настройки"), Width = 580, Height = 370,
                 StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
                 MinimizeBox = false, MaximizeBox = false, AutoScaleMode = AutoScaleMode.Dpi })
             {
@@ -187,10 +192,19 @@ namespace Nikse.SubtitleEdit.PluginLogic
                 layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
                 layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
                 var ranges = new CheckBox { AutoSize = true, Text = Tr("Range markers (use subtitle duration)", "Маркеры-диапазоны по длительности реплик"), Checked = options.RangeMarkers };
-                var names = new CheckBox { AutoSize = true, Text = Tr("Use subtitle text as marker name", "Текст реплики в названии маркера"), Checked = options.TextAsName };
+                var names = new CheckBox { Name = "TextAsName", AutoSize = true, Text = Tr("Use subtitle text as marker name", "Текст реплики в названии маркера"), Checked = options.TextAsName };
                 var descriptions = new CheckBox { AutoSize = true, Text = Tr("Include clean subtitle text in Description", "Текст без тегов в описании маркера"), Checked = options.IncludeDescription };
-                var selection = new CheckBox { AutoSize = true, Text = Tr("Export selected rows only (extended Classic host)", "Только выбранные реплики (обновлённый Classic)"), Checked = options.SelectedOnly };
+                var selection = new CheckBox { Name = "SelectedOnly", AutoSize = true, Text = Tr("Export selected rows only (extended Classic host)", "Только выбранные реплики (обновлённый Classic)"), Checked = options.SelectedOnly };
                 foreach (var control in new Control[] { ranges, names, descriptions, selection }) { layout.Controls.Add(control); layout.SetColumnSpan(control, 2); }
+                var renumber = new CheckBox { Name = "RenumberSelected", AutoSize = true,
+                    Text = Tr("Number from 1, original row in brackets: Маркер 1 (25)",
+                        "Нумерация с 1, исходный номер в скобках: Маркер 1 (25)"),
+                    Checked = options.RenumberSelected, Margin = new Padding(24, 3, 3, 3) };
+                EventHandler updateNumbering = delegate { renumber.Enabled = selection.Checked && !names.Checked; };
+                selection.CheckedChanged += updateNumbering;
+                names.CheckedChanged += updateNumbering;
+                updateNumbering(null, EventArgs.Empty);
+                layout.Controls.Add(renumber); layout.SetColumnSpan(renumber, 2);
                 var label = new Label { AutoSize = true, Text = Tr("Output folder (blank = next to subtitles):", "Папка экспорта (пусто = рядом с субтитрами):") };
                 layout.Controls.Add(label); layout.SetColumnSpan(label, 2);
                 var folder = new TextBox { Dock = DockStyle.Top, Text = options.OutputFolder ?? "" };
@@ -205,7 +219,7 @@ namespace Nikse.SubtitleEdit.PluginLogic
                         MessageBox.Show(dialog, Tr("Choose an existing absolute folder path.", "Выберите существующую папку с полным путём.")); return;
                     }
                     var draft = new ExportOptions { Configured = true, RangeMarkers = ranges.Checked, TextAsName = names.Checked,
-                        IncludeDescription = descriptions.Checked, SelectedOnly = selection.Checked, OutputFolder = folder.Text.Trim() };
+                        IncludeDescription = descriptions.Checked, SelectedOnly = selection.Checked, RenumberSelected = renumber.Checked, OutputFolder = folder.Text.Trim() };
                     try { Persist(draft); } catch (Exception ex) { MessageBox.Show(dialog, ex.Message); return; }
                     dialog.DialogResult = DialogResult.OK;
                 };

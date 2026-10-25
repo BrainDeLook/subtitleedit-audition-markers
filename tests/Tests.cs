@@ -27,6 +27,29 @@ class Tests {
  options.SelectedOnly=true;
  var selected=MarkerExport.Render(cues,options,new[]{1});
  Check(!selected.Contains("Маркер 1") && selected.Contains("Маркер 2"),"Selected only, original numbering");
+ options.RenumberSelected=true;
+ var renumbered=MarkerExport.Render(cues,options,new[]{1});
+ Check(renumbered.Contains("Маркер 1 (2)\t") && !renumbered.Contains("субтитр"),"Sequential name with bare original number");
+ var many=Enumerable.Range(0,40).Select(i=>new Paragraph("row "+(i+1),i*1000,i*1000+500)).ToList();
+ var sparse=MarkerExport.Render(many,options,new[]{37,24,24});
+ Check(sparse.Contains("Маркер 1 (25)\t") && sparse.Contains("Маркер 2 (38)\t"),"Sparse selection follows document order, deduplicates and starts at 1");
+ Check(sparse.Split(new[]{"\r\n"},StringSplitOptions.RemoveEmptyEntries).Length==3,"Only requested selected cues");
+ options.RangeMarkers=false;
+ Check(MarkerExport.Render(many,options,new[]{24}).Contains("Маркер 1 (25)\t00:24.000\t0:00.000"),"Renumbered point keeps original time");
+ options.SelectedOnly=false;
+ Check(!MarkerExport.Render(cues,options,null).Contains("(2)"),"All-cue export ignores selected numbering option");
+ options.SelectedOnly=true;options.TextAsName=true;
+ Check(MarkerExport.Render(cues,options,new[]{1}).Contains("English\t"),"Text-as-name takes precedence");
+ options.TextAsName=false;options.RenumberSelected=false;
+ Check(MarkerExport.Render(cues,options,new[]{1}).Contains("Маркер 2\t"),"Switching off restores document numbering");
+ var serializer=new System.Xml.Serialization.XmlSerializer(typeof(ExportOptions));
+ using(var writer=new StringWriter()) {
+  options.RenumberSelected=true;serializer.Serialize(writer,options);
+  using(var reader=new StringReader(writer.ToString()))Check(((ExportOptions)serializer.Deserialize(reader)).RenumberSelected,"New option round-trips");
+ }
+ using(var reader=new StringReader("<ExportOptions><SelectedOnly>true</SelectedOnly></ExportOptions>"))
+  Check(!((ExportOptions)serializer.Deserialize(reader)).RenumberSelected,"Existing settings retain old numbering");
+ options.RenumberSelected=false;options.RangeMarkers=true;
  Fails(delegate{MarkerExport.Render(cues,options,new int[0]);},"No selected rows rejected");
  Fails(delegate{MarkerExport.Render(cues,options,new[]{9});},"Out-of-range selection rejected");
  options.SelectedOnly=false;options.TextAsName=true;options.IncludeDescription=false;

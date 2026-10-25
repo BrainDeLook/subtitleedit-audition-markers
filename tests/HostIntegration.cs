@@ -21,7 +21,7 @@ class TestPluginToolbar {
  static object Call(object o,string s,params object[] a){return o.GetType().GetMethods(B).First(m=>m.Name==s&&m.GetParameters().Length==a.Length).Invoke(o,a);}
  static void Set(object o,string s,object v){o.GetType().GetField(s,B).SetValue(o,v);}
  static void Options(string root,bool selected) {using(var f=File.Create(Path.Combine(root,"Plugins","AuditionMarkers.settings.xml")))new XmlSerializer(typeof(ExportOptions)).Serialize(f,new ExportOptions{Configured=true,SelectedOnly=selected});}
- [STAThread] static int Main(string[] args) {uint code=0;try{Run(args);}catch(Exception e){Console.Error.WriteLine(e);code=1;}Console.Out.Flush();Console.Error.Flush();TerminateProcess(GetCurrentProcess(),code);return (int)code;}
+ [STAThread] static int Main(string[] args) {uint code=0;try{Application.EnableVisualStyles();Run(args);}catch(Exception e){Console.Error.WriteLine(e);code=1;}Console.Out.Flush();Console.Error.Flush();TerminateProcess(GetCurrentProcess(),code);return (int)code;}
  static void Run(string[] args){
  string root=Path.GetFullPath(args[0]);Directory.CreateDirectory(root);Directory.CreateDirectory(Path.Combine(root,"Plugins"));
  foreach(var field in new[]{"DataDirectory","SettingsFileName","WaveformsDirectory","AutoBackupDirectory","DictionariesDirectory","PluginsDirectory"})typeof(Configuration).GetField(field).SetValue(null,field=="SettingsFileName"?Path.Combine(root,"Settings.xml"):field=="PluginsDirectory"?Path.Combine(root,"Plugins"):root+Path.DirectorySeparatorChar);
@@ -44,8 +44,23 @@ class TestPluginToolbar {
  output=Path.Combine(root,"sample_audition_1.csv");Check(File.Exists(output),"Second click avoids overwrite");
  Check(!File.ReadAllText(output).Contains("Первая")&&File.ReadAllText(output).Contains("Вторая"),"Actual editor selection forwarded");
  using(var timer=new Timer{Interval=150}){
- bool captured=false;timer.Tick+=(s,e)=>{foreach(Form f in Application.OpenForms){if(f==main||!f.Text.Contains(" — "))continue;using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(Path.Combine(root,"settings.png"));}captured=true;timer.Stop();f.DialogResult=DialogResult.Cancel;break;}};
- timer.Start();new AuditionMarkers().Configure(main);Check(captured,"Settings dialog renders and cancels");}
+ bool captured=false;timer.Tick+=(s,e)=>{foreach(Form f in Application.OpenForms){if(f==main||!f.Text.Contains(" — "))continue;
+ var renumber=(CheckBox)f.Controls.Find("RenumberSelected",true).Single();
+ var only=(CheckBox)f.Controls.Find("SelectedOnly",true).Single();
+ var textName=(CheckBox)f.Controls.Find("TextAsName",true).Single();
+ Check(renumber.Enabled,"Numbering available with selected rows");
+ only.Checked=false;Check(!renumber.Enabled,"Numbering disabled for all rows");
+ only.Checked=true;textName.Checked=true;Check(!renumber.Enabled,"Numbering disabled for text names");
+ textName.Checked=false;renumber.Checked=true;
+ using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(Path.Combine(root,"settings.png"));}captured=true;timer.Stop();
+ var layout=f.Controls.OfType<TableLayoutPanel>().Single();
+ var footer=layout.Controls.OfType<FlowLayoutPanel>().Single();
+ footer.Controls.OfType<Button>().Single(b=>b.Text=="Сохранить"||b.Text=="Save").PerformClick();break;}};
+ timer.Start();new AuditionMarkers().Configure(main);Check(captured,"Settings dialog renders and saves");}
+ Check(File.ReadAllText(Path.Combine(root,"Plugins","AuditionMarkers.settings.xml")).Contains("<RenumberSelected>true</RenumberSelected>"),"Preference persisted by real dialog");
+ button().PerformButtonClick();
+ Check(File.ReadAllText(Path.Combine(root,"sample_audition_2.csv")).Contains("Маркер 1 (2)\t"),"Real toolbar uses saved sequential numbering");
+ Check(sub.ToText(new SubRip())==before,"Renumbered export leaves subtitle unchanged");
  File.Delete(Path.Combine(root,"Plugins","AuditionMarkers.dll"));Call(main,"LoadPlugins");Check(!tool.Items.Cast<ToolStripItem>().Any(i=>i.Name.StartsWith("classicPluginToolbar_")),"Uninstall removes toolbar button");
  }
  Console.WriteLine("PASS TOTAL "+count);

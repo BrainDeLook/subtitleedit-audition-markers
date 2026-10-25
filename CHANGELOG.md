@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Added an optional selected-row numbering mode: `Маркер 1 (25)`, `Маркер 2 (38)`, etc., retaining the original document row in parentheses without a label.
+- The preference is saved, defaults to off for existing users, and is available only for selected-row exports with numbered names. Export-all and text-as-name behavior are unchanged.
+- Added conversion, preference compatibility and native settings/toolbar checks for the new option. Audition import remains a manual check.
+
 ## 1.0.0
 
 - Export the current Subtitle Edit document to Adobe Audition tab-delimited CSV markers, without Python or a separate input-file conversion step.

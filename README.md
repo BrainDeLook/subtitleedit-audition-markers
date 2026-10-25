@@ -8,7 +8,7 @@ A separate DLL plugin for the Windows Forms Classic editor. Inspired by the supp
 
 ## Install
 
-1. Download `AuditionMarkers-1.0.0.zip` from Releases and extract it.
+1. Download `AuditionMarkers-1.1.0.zip` from Releases and extract it.
 2. Double-click `Install.cmd`, or copy `AuditionMarkers.dll` into `%APPDATA%\Subtitle Edit\Plugins`. For a portable installation use its own `Plugins` directory instead.
 3. Restart Classic. Use **Tools → Audition markers**. You can assign a shortcut under **Options → Settings → Shortcuts → Plugins**.
 
@@ -32,6 +32,8 @@ For `episode.ass`, the default output is `episode_audition.csv` next to the subt
 | Description | Clean subtitle text, with line breaks flattened |
 | Scope | All cues; selected-only mode requires the extended Classic host |
 | Destination | Next to the subtitle, or a remembered absolute folder |
+
+When **selected-only export** is enabled, the optional **Number from 1** setting produces `Маркер 1 (25)`, `Маркер 2 (38)`, etc. Parentheses contain the original document row, without an extra label. It is off by default to preserve existing settings, and applies to numbered marker names; text-as-name keeps the cue text. Exporting all cues keeps its existing numbering.
 
 The output uses these **tab-separated** columns despite the `.csv` extension:
 
