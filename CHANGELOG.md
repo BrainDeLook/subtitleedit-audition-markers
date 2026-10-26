@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+- Clarified the session-marker workflow in plugin settings, marked-copy results and both READMEs: deselect all clips by clicking an empty track in Audition Multitrack, then Alt+/ and choose the marked MP4. With a clip selected, markers can belong to the clip.
+- Verified all 16 markers on the session ruler with lines across all tracks in Adobe Audition 2026. Dragging video alone does not import session markers.
+- Retains the corrected Adobe XMP UUID, selected-row and actor filters, numbering and CSV export from 1.2.1. No host update is needed for users already on Classic 4.0.28.6.
+
 ## 1.2.1
 
 - Fixed the MP4 XMP UUID to match Adobe XMP Toolkit. Version 1.2.0 wrote a wrong identifier, causing Audition to report no supported markers. Re-embedding migrates files carrying the old plugin track.

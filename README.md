@@ -8,7 +8,7 @@ A separate DLL plugin for the Windows Forms Classic editor. Inspired by the supp
 
 ## Install
 
-1. Download `AuditionMarkers-1.2.1.zip` from Releases and extract it.
+1. Download `AuditionMarkers-1.2.2.zip` from Releases and extract it.
 2. Double-click `Install.cmd`, or copy `AuditionMarkers.dll` into `%APPDATA%\Subtitle Edit\Plugins`. For a portable installation use its own `Plugins` directory instead.
 3. Restart Classic. Use **Tools → Audition markers**. You can assign a shortcut under **Options → Settings → Shortcuts → Plugins**.
 
@@ -28,7 +28,7 @@ The settings dialog also offers **Embed in existing MP4…**. It creates a separ
 
 Writes use cancellable streaming, a temporary file beside the output and atomic replacement. Allow free space approximately equal to the output video for automatic embedding (more for creating a separate manual copy). Existing unrelated XMP properties and tracks are retained; only this plugin's named track is replaced on repeat embedding. Malformed/ambiguous XMP and unsupported QuickTime-style files are refused rather than overwritten.
 
-**Verified in Adobe Audition 2026:** use **File → Import → Markers from File… (Alt+/)** and select the marked MP4 while your destination audio or multitrack session is active. This imports the embedded markers into that document. Opening/inserting video alone does not import them into the session. Selected Cyrillic markers, source row numbers, point times and a test range were verified in Audition. Plain MP4 chapters are not used as a substitute for Adobe markers.
+**Verified in Adobe Audition 2026:** for session markers, first click an empty area of an empty track in Multitrack to deselect all clips. Then use **File → Import → Markers from File… (Alt+/)** and select the marked MP4 while your destination audio or multitrack session is active. This imports the embedded markers into that document. Opening/inserting video alone does not import them into the session. Selected Cyrillic markers, source row numbers, point times and a test range were verified in Audition. Plain MP4 chapters are not used as a substitute for Adobe markers.
 
 **Upgrading from 1.2.0:** that version used an incorrect XMP UUID, so Audition could not discover its embedded track. Install 1.2.1 and use **Embed in existing MP4…** to create a corrected copy with your current cue selection; no video/audio re-encoding is needed.
 
@@ -63,7 +63,7 @@ Time Format is `decimal`, Type is `Cue`, and times use total minutes, seconds an
 
 ## Import into Audition
 
-Open the corresponding audio or session and use **File → Import → Markers from File… (Alt+/)**, then choose the CSV or marked MP4. Check a few marker positions, Cyrillic descriptions and range endpoints. This exports marker data; it does not transfer audio, create audio clips, or control Audition automatically.
+For markers on the entire session timeline, open Multitrack and click an empty area of an empty track to deselect all clips. With a clip selected, markers can belong to that clip instead. Then use **File → Import → Markers from File… (Alt+/)**, then choose the CSV or marked MP4. Check a few marker positions, Cyrillic descriptions and range endpoints. This exports marker data; it does not transfer audio, create audio clips, or control Audition automatically.
 
 MP4 imports were verified directly in Adobe Audition 2026. CSV output follows the provided DeCoCo converter schema. The plugin does not control Audition automatically.
 
