@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $target) -or -not (Test-Path -LiteralPath (Join
 if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $manifest.targetSha256) {throw 'Toolbar update checksum mismatch.'}
 $current = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
 if ($current -eq $manifest.targetSha256) {Write-Output 'Toolbar support is already installed.'; exit 0}
-if ($current -ne $manifest.sourceSha256) {throw 'This update is only for the exact Classic 4.0.28.4 stable EXE. The installed file was left unchanged.'}
+if ($current -notin @($manifest.sourceSha256s)) {throw 'This update supports only the verified Classic 4.0.28.4 / 4.0.28.5 EXEs. The installed file was left unchanged.'}
 $needsAdmin = $root.StartsWith([Environment]::GetFolderPath('ProgramFiles')+'\',[StringComparison]::OrdinalIgnoreCase)
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $admin = ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -22,8 +22,8 @@ if ($needsAdmin -and -not $admin) {
 }
 $running = Get-Process -Name SubtitleEdit -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq $target}
 if ($running) {throw 'Close Subtitle Edit Classic, then run this update again. No process was terminated.'}
-$backup = Join-Path $root 'SubtitleEdit.exe.before-plugin-toolbar'
-if (Test-Path -LiteralPath $backup) {throw 'A toolbar rollback file already exists. Keep or restore it before retrying.'}
+$backup = Join-Path $root 'SubtitleEdit.exe.before-audition-1.2'
+if (Test-Path -LiteralPath $backup) {throw 'An Audition integration rollback file already exists. Keep or restore it before retrying.'}
 $temp = Join-Path $root ('SubtitleEdit.plugin-update-'+[Guid]::NewGuid().ToString('N')+'.tmp')
 try {
     Copy-Item -LiteralPath $source -Destination $temp
@@ -33,5 +33,5 @@ try {
     # Only our own single temporary file; no recursive deletion.
     if (Test-Path -LiteralPath $temp) {Remove-Item -LiteralPath $temp -Force}
 }
-Write-Output 'Classic 4.0.28.5 toolbar support installed. Settings and dependencies were retained.'
+Write-Output 'Classic 4.0.28.6 optional Audition plugin integration installed. Settings and dependencies were retained.'
 Write-Output ('Rollback EXE: '+$backup)

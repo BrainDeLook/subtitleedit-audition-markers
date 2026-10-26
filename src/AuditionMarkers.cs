@@ -33,8 +33,11 @@ namespace Nikse.SubtitleEdit.PluginLogic
         public bool IncludeDescription { get; set; }
         public bool SelectedOnly { get; set; }
         public bool RenumberSelected { get; set; }
+        public bool ActorsOnly { get; set; }
+        public string[] ActorNames { get; set; }
+        public bool EmbedOnHardSub { get; set; }
         public string OutputFolder { get; set; }
-        public ExportOptions() { IncludeDescription = true; OutputFolder = ""; }
+        public ExportOptions() { IncludeDescription = true; OutputFolder = ""; ActorNames = new string[0]; }
     }
 
     public static class MarkerExport
@@ -76,32 +79,63 @@ namespace Nikse.SubtitleEdit.PluginLogic
                 "\"" + value.Replace("\"", "\"\"") + "\"";
         }
 
-        public static string Render(IList<Paragraph> cues, ExportOptions options, int[] selected)
+        public static List<Paragraph> ParseCurrent(string srt, string raw)
+        {
+            if (!string.IsNullOrEmpty(raw) && raw.TrimStart().StartsWith("[Script Info]", StringComparison.OrdinalIgnoreCase))
+            {
+                var sub = new Subtitle();
+                var lines = Regex.Split(raw, "\\r\\n|\\n|\\r").ToList();
+                SubtitleFormat parser = (raw.IndexOf("[V4+ Styles]", StringComparison.OrdinalIgnoreCase) >= 0 || raw.IndexOf("v4.00+", StringComparison.OrdinalIgnoreCase) >= 0)
+                    ? (SubtitleFormat)new AdvancedSubStationAlpha() : new SubStationAlpha();
+                parser.LoadSubtitle(sub, lines, null);
+                if (parser.ErrorCount != 0 || sub.Paragraphs.Count == 0) throw new InvalidDataException("ASS actor data could not be read completely.");
+                if (sub.Paragraphs.Count != Parse(srt).Count) throw new InvalidDataException("ASS and editor subtitle counts differ; actor filtering was not applied.");
+                return sub.Paragraphs;
+            }
+            return Parse(srt);
+        }
+
+        public static List<AuditionMarker> Build(IList<Paragraph> cues, ExportOptions options, int[] selected,
+            double cutStart, double cutEnd, double clockScale)
         {
             var selection = new HashSet<int>(selected ?? new int[0]);
-            if (options.SelectedOnly && selection.Count == 0)
-                throw new InvalidDataException("Select subtitle rows first.");
-            var output = new StringBuilder(Header + "\r\n");
-            int count = 0;
+            var actors = new HashSet<string>(options.ActorNames ?? new string[0], StringComparer.Ordinal);
+            if (options.SelectedOnly && selection.Count == 0) throw new InvalidDataException("Select subtitle rows first.");
+            if (options.ActorsOnly && actors.Count == 0) throw new InvalidDataException("Choose at least one actor in Audition Markers settings.");
+            if (double.IsNaN(cutEnd) || cutStart < 0 || double.IsNaN(cutStart) || double.IsInfinity(cutStart) || cutEnd <= cutStart ||
+                clockScale <= 0 || double.IsNaN(clockScale) || double.IsInfinity(clockScale)) throw new InvalidDataException("Invalid export timing window.");
+            var result = new List<AuditionMarker>();
             for (int i = 0; i < cues.Count; i++)
             {
                 if (options.SelectedOnly && !selection.Contains(i)) continue;
                 var cue = cues[i];
-                if (cue.EndTime.TotalMilliseconds < cue.StartTime.TotalMilliseconds)
-                    throw new InvalidDataException("Subtitle " + (i + 1) + " ends before it starts.");
-                string start = Time(cue.StartTime.TotalMilliseconds);
-                string duration = options.RangeMarkers ? Time(cue.EndTime.TotalMilliseconds - cue.StartTime.TotalMilliseconds) : "0:00.000";
-                string text = PlainText(cue.Text);
-                string number = (i + 1).ToString(CultureInfo.InvariantCulture);
-                string markerName = options.SelectedOnly && options.RenumberSelected
-                    ? "Маркер " + (count + 1).ToString(CultureInfo.InvariantCulture) + " (" + number + ")"
+                if (options.ActorsOnly && !actors.Contains(cue.Actor ?? "")) continue;
+                double start = cue.StartTime.TotalMilliseconds, end = cue.EndTime.TotalMilliseconds;
+                Time(start); Time(end);
+                if (end < start) throw new InvalidDataException("Subtitle " + (i + 1) + " ends before it starts.");
+                if (start >= cutEnd || end < cutStart || (end == cutStart && start < cutStart)) continue;
+                start = Math.Max(0, (start - cutStart) * clockScale);
+                end = Math.Min((end - cutStart) * clockScale, cutEnd - cutStart);
+                if (end < start) continue;
+                string text = PlainText(cue.Text), number = (i + 1).ToString(CultureInfo.InvariantCulture);
+                string name = (options.SelectedOnly || options.ActorsOnly) && options.RenumberSelected
+                    ? "Маркер " + (result.Count + 1).ToString(CultureInfo.InvariantCulture) + " (" + number + ")"
                     : "Маркер " + number;
-                string name = options.TextAsName && text.Length > 0 ? text : markerName;
-                output.Append(Field(name)).Append('\t').Append(start).Append('\t').Append(duration)
-                    .Append("\tdecimal\tCue\t").Append(Field(options.IncludeDescription ? text : "")).Append("\r\n");
-                count++;
+                result.Add(new AuditionMarker { Start = start, Duration = options.RangeMarkers ? end - start : 0,
+                    Name = options.TextAsName && text.Length > 0 ? text : name,
+                    Description = options.IncludeDescription ? text : "", Actor = cue.Actor ?? "" });
             }
-            if (count == 0) throw new InvalidDataException("No subtitle rows to export.");
+            if (result.Count == 0) throw new InvalidDataException("No matching subtitle markers in the output time range.");
+            return result;
+        }
+
+        public static string Render(IList<Paragraph> cues, ExportOptions options, int[] selected)
+        {
+            var output = new StringBuilder(Header + "\r\n");
+            foreach (var marker in Build(cues, options, selected, 0, double.PositiveInfinity, 1))
+                output.Append(Field(marker.Name)).Append('\t').Append(Time(marker.Start)).Append('\t')
+                    .Append(options.RangeMarkers ? Time(marker.Duration) : "0:00.000").Append("\tdecimal\tCue\t")
+                    .Append(Field(marker.Description)).Append("\r\n");
             return output.ToString();
         }
 
@@ -127,18 +161,21 @@ namespace Nikse.SubtitleEdit.PluginLogic
         }
     }
 
-    public class AuditionMarkers : IPlugin
+    public partial class AuditionMarkers : IPlugin
     {
         public string Name { get { return "AuditionMarkers"; } }
         public string Text { get { return Ru ? "Маркеры Audition" : "Audition markers"; } }
-        public decimal Version { get { return 1.1m; } }
+        public decimal Version { get { return 1.2m; } }
         public string Description { get { return "One-click Adobe Audition CSV marker export (DeCoCo)."; } }
         public string ActionType { get { return "Tool"; } }
         public string Shortcut { get { return ""; } }
         // Optional Classic host extension; older hosts still support the menu command.
         public string ToolbarText { get { return Text; } }
         public string StatusMessage { get; private set; }
-        private static bool Ru { get { return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"; } }
+        private static bool Ru { get {
+            string language = Configuration.Settings.General.Language;
+            return (string.IsNullOrEmpty(language) ? CultureInfo.CurrentUICulture.Name : language).StartsWith("ru", StringComparison.OrdinalIgnoreCase);
+        } }
         private static string Tr(string en, string ru) { return Ru ? ru : en; }
         private static string SettingsFile { get { return Path.Combine(Configuration.DataDirectory, "Plugins", "AuditionMarkers.settings.xml"); } }
 
@@ -182,66 +219,20 @@ namespace Nikse.SubtitleEdit.PluginLogic
             catch (Exception ex) { MessageBox.Show(parent, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
 
-        private bool EditOptions(Form parent, ExportOptions options)
-        {
-            using (var dialog = new Form { Text = Text + " — " + Tr("Settings", "Настройки"), Width = 580, Height = 370,
-                StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
-                MinimizeBox = false, MaximizeBox = false, AutoScaleMode = AutoScaleMode.Dpi })
-            {
-                var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
-                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-                layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-                var ranges = new CheckBox { AutoSize = true, Text = Tr("Range markers (use subtitle duration)", "Маркеры-диапазоны по длительности реплик"), Checked = options.RangeMarkers };
-                var names = new CheckBox { Name = "TextAsName", AutoSize = true, Text = Tr("Use subtitle text as marker name", "Текст реплики в названии маркера"), Checked = options.TextAsName };
-                var descriptions = new CheckBox { AutoSize = true, Text = Tr("Include clean subtitle text in Description", "Текст без тегов в описании маркера"), Checked = options.IncludeDescription };
-                var selection = new CheckBox { Name = "SelectedOnly", AutoSize = true, Text = Tr("Export selected rows only (extended Classic host)", "Только выбранные реплики (обновлённый Classic)"), Checked = options.SelectedOnly };
-                foreach (var control in new Control[] { ranges, names, descriptions, selection }) { layout.Controls.Add(control); layout.SetColumnSpan(control, 2); }
-                var renumber = new CheckBox { Name = "RenumberSelected", AutoSize = true,
-                    Text = Tr("Number from 1, original row in brackets: Маркер 1 (25)",
-                        "Нумерация с 1, исходный номер в скобках: Маркер 1 (25)"),
-                    Checked = options.RenumberSelected, Margin = new Padding(24, 3, 3, 3) };
-                EventHandler updateNumbering = delegate { renumber.Enabled = selection.Checked && !names.Checked; };
-                selection.CheckedChanged += updateNumbering;
-                names.CheckedChanged += updateNumbering;
-                updateNumbering(null, EventArgs.Empty);
-                layout.Controls.Add(renumber); layout.SetColumnSpan(renumber, 2);
-                var label = new Label { AutoSize = true, Text = Tr("Output folder (blank = next to subtitles):", "Папка экспорта (пусто = рядом с субтитрами):") };
-                layout.Controls.Add(label); layout.SetColumnSpan(label, 2);
-                var folder = new TextBox { Dock = DockStyle.Top, Text = options.OutputFolder ?? "" };
-                var browse = new Button { Text = "…", AutoSize = true };
-                browse.Click += delegate { using (var picker = new FolderBrowserDialog()) { if (Directory.Exists(folder.Text)) picker.SelectedPath = folder.Text; if (picker.ShowDialog(dialog) == DialogResult.OK) folder.Text = picker.SelectedPath; } };
-                layout.Controls.Add(folder); layout.Controls.Add(browse);
-                var footer = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill, AutoSize = true };
-                var cancel = new Button { AutoSize = true, Text = Tr("Cancel", "Отмена"), DialogResult = DialogResult.Cancel };
-                var ok = new Button { AutoSize = true, Text = Tr("Save", "Сохранить") };
-                ok.Click += delegate {
-                    if (!string.IsNullOrWhiteSpace(folder.Text) && (!Path.IsPathRooted(folder.Text.Trim()) || !Directory.Exists(folder.Text.Trim()))) {
-                        MessageBox.Show(dialog, Tr("Choose an existing absolute folder path.", "Выберите существующую папку с полным путём.")); return;
-                    }
-                    var draft = new ExportOptions { Configured = true, RangeMarkers = ranges.Checked, TextAsName = names.Checked,
-                        IncludeDescription = descriptions.Checked, SelectedOnly = selection.Checked, RenumberSelected = renumber.Checked, OutputFolder = folder.Text.Trim() };
-                    try { Persist(draft); } catch (Exception ex) { MessageBox.Show(dialog, ex.Message); return; }
-                    dialog.DialogResult = DialogResult.OK;
-                };
-                footer.Controls.Add(cancel); footer.Controls.Add(ok); layout.Controls.Add(footer); layout.SetColumnSpan(footer, 2);
-                dialog.Controls.Add(layout); dialog.AcceptButton = ok; dialog.CancelButton = cancel;
-                return dialog.ShowDialog(parent) == DialogResult.OK;
-            }
-        }
-
         public string DoAction(Form parent, string srt, double frameRate, string lineSeparator, string fileName, string videoFileName, string rawText)
-        { return Export(parent, srt, fileName, null); }
+        { return Export(parent, srt, fileName, rawText, null); }
 
         public string DoActionWithSelection(Form parent, string srt, double frameRate, string lineSeparator,
             string fileName, string videoFileName, string rawText, int[] selected)
-        { return Export(parent, srt, fileName, selected); }
+        { return Export(parent, srt, fileName, rawText, selected); }
 
-        private string Export(Form parent, string srt, string fileName, int[] selected)
+        private string Export(Form parent, string srt, string fileName, string rawText, int[] selected)
         {
             StatusMessage = null;
             try
             {
-                var cues = MarkerExport.Parse(srt);
+                var cues = MarkerExport.ParseCurrent(srt, rawText);
+                _context = cues; _selectedContext = selected;
                 var options = Load();
                 if (!options.Configured) { if (!EditOptions(parent, options)) return null; options = Load(); }
                 if (options.SelectedOnly && selected == null)

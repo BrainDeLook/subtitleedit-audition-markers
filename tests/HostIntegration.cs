@@ -46,21 +46,34 @@ class TestPluginToolbar {
  using(var timer=new Timer{Interval=150}){
  bool captured=false;timer.Tick+=(s,e)=>{foreach(Form f in Application.OpenForms){if(f==main||!f.Text.Contains(" — "))continue;
  var renumber=(CheckBox)f.Controls.Find("RenumberSelected",true).Single();
- var only=(CheckBox)f.Controls.Find("SelectedOnly",true).Single();
+ var only=(ComboBox)f.Controls.Find("ExportScope",true).Single();
  var textName=(CheckBox)f.Controls.Find("TextAsName",true).Single();
  Check(renumber.Enabled,"Numbering available with selected rows");
- only.Checked=false;Check(!renumber.Enabled,"Numbering disabled for all rows");
- only.Checked=true;textName.Checked=true;Check(!renumber.Enabled,"Numbering disabled for text names");
+ only.SelectedIndex=0;Check(!renumber.Enabled,"Numbering disabled for all rows");
+ only.SelectedIndex=1;textName.Checked=true;Check(!renumber.Enabled,"Numbering disabled for text names");
  textName.Checked=false;renumber.Checked=true;
  using(var bmp=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(bmp,new Rectangle(0,0,f.Width,f.Height));bmp.Save(Path.Combine(root,"settings.png"));}captured=true;timer.Stop();
  var layout=f.Controls.OfType<TableLayoutPanel>().Single();
- var footer=layout.Controls.OfType<FlowLayoutPanel>().Single();
+ var footer=f.Controls.OfType<FlowLayoutPanel>().Single();
  footer.Controls.OfType<Button>().Single(b=>b.Text=="Сохранить"||b.Text=="Save").PerformClick();break;}};
  timer.Start();new AuditionMarkers().Configure(main);Check(captured,"Settings dialog renders and saves");}
  Check(File.ReadAllText(Path.Combine(root,"Plugins","AuditionMarkers.settings.xml")).Contains("<RenumberSelected>true</RenumberSelected>"),"Preference persisted by real dialog");
  button().PerformButtonClick();
  Check(File.ReadAllText(Path.Combine(root,"sample_audition_2.csv")).Contains("Маркер 1 (2)\t"),"Real toolbar uses saved sequential numbering");
  Check(sub.ToText(new SubRip())==before,"Renumbered export leaves subtitle unchanged");
+ sub.Header=AdvancedSubStationAlpha.DefaultHeader;sub.Paragraphs[0].Actor="ДАНЯ";sub.Paragraphs[1].Actor="ЭМИ";
+ Set(main,"_currentSubtitleFormat",new AdvancedSubStationAlpha());
+ using(var timer=new Timer{Interval=150}){
+  bool chosen=false;timer.Tick+=(s,e)=>{foreach(Form f in Application.OpenForms){if(f==main||!f.Text.Contains(" — "))continue;
+   var scope=(ComboBox)f.Controls.Find("ExportScope",true).Single();scope.SelectedIndex=2;
+   var list=(CheckedListBox)f.Controls.Find("ActorNames",true).Single();Check(list.Enabled&&list.Items.Count==2,"Toolbar settings receive current ASS actors");
+   for(int i=0;i<list.Items.Count;i++)list.SetItemChecked(i,list.Items[i].ToString()=="ДАНЯ");
+   chosen=true;timer.Stop();((Button)f.Controls.Find("SaveSettings",true).Single()).PerformClick();break;}};
+  timer.Start();button().DropDownItems[0].PerformClick();Check(chosen,"Actor selection saved through toolbar settings");
+ }
+ button().PerformButtonClick();var actorCsv=File.ReadAllText(Path.Combine(root,"sample_audition_3.csv"));
+ Check(actorCsv.Contains("Маркер 1 (1)\t")&&actorCsv.Contains("Первая")&&!actorCsv.Contains("Вторая"),"Actual actor export ignores unrelated highlighted row");
+ Check(sub.Paragraphs.Count==2&&sub.Paragraphs[1].Actor=="ЭМИ","Actor filtering retains unchosen cues");
  File.Delete(Path.Combine(root,"Plugins","AuditionMarkers.dll"));Call(main,"LoadPlugins");Check(!tool.Items.Cast<ToolStripItem>().Any(i=>i.Name.StartsWith("classicPluginToolbar_")),"Uninstall removes toolbar button");
  }
  Console.WriteLine("PASS TOTAL "+count);

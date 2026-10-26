@@ -5,7 +5,7 @@ $out = Join-Path $PSScriptRoot 'dist'
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $core = Join-Path $ClassicDirectory 'libse.dll'
 if (-not (Test-Path -LiteralPath $core)) {throw 'Pass -ClassicDirectory pointing to an installed Subtitle Edit Classic.'}
-& $compiler /nologo /target:library /optimize+ ('/out:'+(Join-Path $out 'AuditionMarkers.dll')) /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Xml.dll ('/reference:'+$core) (Join-Path $PSScriptRoot 'src/AuditionMarkers.cs')
+& $compiler /nologo /target:library /optimize+ ('/out:'+(Join-Path $out 'AuditionMarkers.dll')) /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Xml.dll /reference:System.Xml.Linq.dll ('/reference:'+$core) @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' | ForEach-Object FullName)
 if ($LASTEXITCODE -ne 0) {throw 'Plugin compilation failed'}
 if ($Test) {
  $testOut = Join-Path $PSScriptRoot 'test-output'

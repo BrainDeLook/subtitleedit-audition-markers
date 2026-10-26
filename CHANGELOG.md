@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- Added common all/selected-row/actor marker filtering, including multiple ASS/SSA actors and an explicit unassigned-actor entry. Numbering retains original document row references.
+- Added Adobe XMP Cue marker embedding inside MP4, with XML escaping, millisecond tracks, existing-metadata preservation, bounds validation, cancellation and staged atomic replacement.
+- Added an optional post-hard-subtitle host hook and plugin-owned checkbox/settings control. With no plugin installed, Classic adds no marker UI or processing. Clip offsets and boundary-crossing ranges are rebased/clamped.
+- Added manual marked-video copy export from settings; retained one-click CSV export as the default toolbar action.
+- This requires the optional Classic 4.0.28.6 host extension for live actor settings and automatic hard-subtitle integration. MOV/MKV and batch embedding are not enabled.
+- Validation: 61 converter/XMP/file checks, 21 native toolbar/settings checks and seven actual hard-subtitle integration checks passed. Encoded video/audio packet hashes remain identical after embedding and the output decodes. Audition import/display is still a manual acceptance check.
+
 ## 1.1.0
 
 - Added an optional selected-row numbering mode: `Маркер 1 (25)`, `Маркер 2 (38)`, etc., retaining the original document row in parentheses without a label.
