@@ -18,7 +18,10 @@ namespace Nikse.SubtitleEdit.PluginLogic
     public static class Mp4Markers
     {
         // Adobe's XMP UUID, in on-disk (network) byte order, not Guid.ToByteArray order.
-        private static readonly byte[] Uuid = { 0xbe,0x7a,0xcf,0xcb,0x97,0xa9,0x42,0xe8,0x9c,0x71,0x99,0x9f,0xbe,0x5e,0xff,0xdb };
+        // Adobe XMP Toolkit, ISOBaseMedia_Support.hpp: ISOMedia::k_xmpUUID.
+        private static readonly byte[] Uuid = { 0xbe,0x7a,0xcf,0xcb,0x97,0xa9,0x42,0xe8,0x9c,0x71,0x99,0x94,0x91,0xe3,0xaf,0xac };
+        // Version 1.2.0 wrote a mistaken UUID. Read it only to migrate our own metadata.
+        private static readonly byte[] LegacyUuid = { 0xbe,0x7a,0xcf,0xcb,0x97,0xa9,0x42,0xe8,0x9c,0x71,0x99,0x9f,0xbe,0x5e,0xff,0xdb };
         public const string TrackName = "Subtitle Edit Classic / Audition Markers";
         private static readonly XNamespace Rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
         private static readonly XNamespace Dm = "http://ns.adobe.com/xmp/1.0/DynamicMedia/";
@@ -137,10 +140,17 @@ namespace Nikse.SubtitleEdit.PluginLogic
                     foreach(var box in boxes.Where(b=>b.Type=="uuid" && b.Size>=b.Header+16))
                     {
                         input.Position=box.Offset+box.Header;
-                        if(!Read(input,16).SequenceEqual(Uuid))continue;
-                        if(old!=null)throw new InvalidDataException("Multiple XMP UUID boxes; refusing an ambiguous update.");
+                        var id=Read(input,16);
+                        if(!id.SequenceEqual(Uuid) && !id.SequenceEqual(LegacyUuid))continue;
                         if(box.Size-box.Header-16>16*1024*1024)throw new InvalidDataException("Existing XMP packet exceeds 16 MiB.");
-                        old=box; existing=new UTF8Encoding(false,true).GetString(Read(input,(int)(box.Size-box.Header-16))).TrimEnd('\0');
+                        string candidate=new UTF8Encoding(false,true).GetString(Read(input,(int)(box.Size-box.Header-16))).TrimEnd('\0');
+                        if(id.SequenceEqual(LegacyUuid))
+                        {
+                            using(var reader=XmlReader.Create(new StringReader(candidate),new XmlReaderSettings { DtdProcessing=DtdProcessing.Prohibit, XmlResolver=null, MaxCharactersInDocument=16*1024*1024 }))
+                                if(!XDocument.Load(reader).Descendants(Dm+"trackName").Any(n=>n.Value==TrackName))continue;
+                        }
+                        if(old!=null)throw new InvalidDataException("Multiple XMP UUID boxes; refusing an ambiguous update.");
+                        old=box; existing=candidate;
                     }
                     byte[] packet=new UTF8Encoding(false).GetBytes(Packet(existing,markers));
                     input.Position=0; var buffer=new byte[1024*1024]; int read;

@@ -57,6 +57,9 @@ namespace Nikse.SubtitleEdit.PluginLogic
                 row(renumber);
                 var embed = new CheckBox { Name = "EmbedOnHardSub", AutoSize = true,
                     Text = Tr("Embed markers after MP4 hard-subtitle export", "Встраивать метки после создания хардсаба MP4"), Checked = options.EmbedOnHardSub }; row(embed);
+                row(new Label { AutoSize = true, MaximumSize = new Size(580, 0),
+                    Text = Tr("In Audition: File → Import → Markers from File… (Alt+/), then choose the marked MP4. Import markers into the open audio or session.",
+                        "В Audition: File → Import → Markers from File… (Alt+/), выберите MP4 с метками. Они импортируются в открытый звук или сессию.") });
                 EventHandler refresh = delegate { actors.Enabled = scope.SelectedIndex == 2; actorNote.Enabled = actors.Enabled; renumber.Enabled = scope.SelectedIndex != 0 && !names.Checked; };
                 scope.SelectedIndexChanged += refresh; names.CheckedChanged += refresh; refresh(null, EventArgs.Empty);
                 row(new Label { AutoSize = true, Text = Tr("CSV folder (blank = next to subtitles):", "Папка CSV (пусто = рядом с субтитрами):") });
@@ -87,7 +90,7 @@ namespace Nikse.SubtitleEdit.PluginLogic
                         {
                             if (picker.ShowDialog(dialog) != DialogResult.OK) return;
                             string result = RunCopy(dialog, picker.FileName, markers);
-                            if (result != null) MessageBox.Show(dialog, Tr("Created: ", "Создан файл: ") + result, Text);
+                            if (result != null) MessageBox.Show(dialog, Tr("Created: ", "Создан файл: ") + result + "\n\nAudition: File → Import → Markers from File… (Alt+/)", Text);
                         }
                     }
                     catch (OperationCanceledException) { }

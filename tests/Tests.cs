@@ -111,6 +111,16 @@ class Tests {
  var original=File.ReadAllBytes(mp4);Mp4Markers.Embed(mp4,markers,null);var embedded=File.ReadAllBytes(mp4);
  Check(embedded.Take(original.Length).SequenceEqual(original),"Embedding leaves original MP4 boxes byte identical");
  Check(System.Text.Encoding.UTF8.GetString(embedded).Contains("Маркер 1 (25)"),"XMP inside MP4 file");
+ // Independent Adobe SDK constant: do not obtain it from the implementation under test.
+ var adobeUuid=new byte[]{0xBE,0x7A,0xCF,0xCB,0x97,0xA9,0x42,0xE8,0x9C,0x71,0x99,0x94,0x91,0xE3,0xAF,0xAC};
+ Check(embedded.Skip(original.Length+8).Take(16).SequenceEqual(adobeUuid),"Adobe SDK MPEG4 XMP UUID in network order");
+ string legacy=Path.Combine(folder,"legacy-1.2.0.mp4");
+ var legacyBytes=(byte[])embedded.Clone();
+ var wrongUuid=new byte[]{0xBE,0x7A,0xCF,0xCB,0x97,0xA9,0x42,0xE8,0x9C,0x71,0x99,0x9F,0xBE,0x5E,0xFF,0xDB};
+ Array.Copy(wrongUuid,0,legacyBytes,original.Length+8,16);File.WriteAllBytes(legacy,legacyBytes);
+ Mp4Markers.Embed(legacy,markers,null);var migrated=File.ReadAllBytes(legacy);
+ Check(migrated.Take(original.Length).SequenceEqual(original),"Migrating 1.2.0 preserves media bytes");
+ Check(System.Text.Encoding.ASCII.GetString(migrated,original.Length+4,4)=="free" && migrated.Skip(legacyBytes.Length+8).Take(16).SequenceEqual(adobeUuid),"Legacy UUID retired and standard Adobe box emitted");
  var beforeCancel=File.ReadAllBytes(mp4);Fails(delegate{Mp4Markers.Embed(mp4,markers,()=>true);},"Cancellation raised");
  Check(File.ReadAllBytes(mp4).SequenceEqual(beforeCancel),"Cancel preserves complete original video");
  Mp4Markers.Embed(mp4,markers,null);

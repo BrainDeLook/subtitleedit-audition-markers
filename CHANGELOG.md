@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed the MP4 XMP UUID to match Adobe XMP Toolkit. Version 1.2.0 wrote a wrong identifier, causing Audition to report no supported markers. Re-embedding migrates files carrying the old plugin track.
+- Added an independent UUID regression fixture and migration checks.
+- Added the explicit Audition import instruction to settings and marked-copy results: File → Import → Markers from File… (Alt+/), choose the marked MP4.
+- Verified in Adobe Audition 2026: all 16 selected markers from a user video imported into the multitrack session, with Cyrillic names, original row numbers and correct timestamps; a test range imported at 1.234–1.984 seconds. Audio/video bytes were unchanged.
+
 ## 1.2.0
 
 - Added common all/selected-row/actor marker filtering, including multiple ASS/SSA actors and an explicit unassigned-actor entry. Numbering retains original document row references.

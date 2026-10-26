@@ -165,7 +165,7 @@ namespace Nikse.SubtitleEdit.PluginLogic
     {
         public string Name { get { return "AuditionMarkers"; } }
         public string Text { get { return Ru ? "Маркеры Audition" : "Audition markers"; } }
-        public decimal Version { get { return 1.2m; } }
+        public decimal Version { get { return 1.21m; } }
         public string Description { get { return "One-click Adobe Audition CSV marker export (DeCoCo)."; } }
         public string ActionType { get { return "Tool"; } }
         public string Shortcut { get { return ""; } }
